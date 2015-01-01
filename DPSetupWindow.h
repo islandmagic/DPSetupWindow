@@ -8,14 +8,21 @@
 
 #import <Cocoa/Cocoa.h>
 
-#define kDPNotification_addNextViewController       @"kDPNotification_addNextViewController"
-#define kDPNotification_addFinalViewController      @"kDPNotification_addFinalViewController"
-#define kDPNotification_deleteViewController        @"kDPNotification_deleteViewController"
-
-#define kDPNotification_key_viewController          @"kDPNotification_key_viewController"
-#define kDPNotification_key_viewControllerClass     @"kDPNotification_key_viewControllerClass"
-
 @class DPSetupWindow;
+
+@protocol DPSetupWindowDelegate <NSObject>
+
+@optional
+
+- (void)setupWindow:(DPSetupWindow*)window
+   willTransiteFrom:(NSViewController*)fromViewController
+				 to:(NSViewController*)toViewController;
+
+- (void)setupWindow:(DPSetupWindow*)window
+	didTransiteFrom:(NSViewController*)fromViewController
+				 to:(NSViewController*)toViewController;
+
+@end
 
 @protocol DPSetupWindowStageViewController <NSObject>
 @optional
@@ -84,31 +91,11 @@
 @property (assign) BOOL animates;
 @property (retain) NSArray *viewControllers;
 @property (assign) BOOL funnelsRepresentedObjects;
+@property (weak) id<DPSetupWindowDelegate> setupWindowDelegate;
 
 - (id)initWithViewControllers:(NSArray *)viewControllers completionHandler:(void (^)(BOOL completed))completionHandler;
-
-- (void)addNextViewController:(NSViewController<DPSetupWindowStageViewController> *)viewController;
-- (void)addFinalViewController:(NSViewController<DPSetupWindowStageViewController> *)viewController;
 - (void)progressToNextStage;
 - (void)revertToPreviousStage;
 - (void)resetToZeroStage;
-
-@end
-
-@interface NSObject (PerformSelectorIfExists)
-- (id)performSelectorIfExists:(SEL)selector;
-@end
-@implementation NSObject (PerformSelectorIfExists)
-
-- (id)performSelectorIfExists:(SEL)selector {
-	if ([self respondsToSelector:selector]) {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-		return [self performSelector:selector];
-#pragma clang diagnostic pop
-	} else {
-		return nil;
-	}
-}
 
 @end

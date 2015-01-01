@@ -8,6 +8,25 @@
 
 #import "DPSetupWindow.h"
 
+@interface NSObject (PerformSelectorIfExists)
+- (id)performSelectorIfExists:(SEL)selector;
+@end
+@implementation NSObject (PerformSelectorIfExists)
+
+- (id)performSelectorIfExists:(SEL)selector {
+	if ([self respondsToSelector:selector]) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+		return [self performSelector:selector];
+#pragma clang diagnostic pop
+	} else {
+		return nil;
+	}
+}
+
+@end
+
+
 @interface DPSetupWindow ()
 
 @property (retain) NSImageView *imageView;
@@ -41,14 +60,8 @@
 	
 	[self setContentView:[self initialiseContentViewForRect:contentRect]];
 	[self next:nil];
-    [self addNotifications];
-    
-    return self;
-}
 
-- (void)dealloc{
-    
-    [self removeNotifications];
+    return self;
 }
 
 - (NSView *)initialiseContentViewForRect:(NSRect)contentRect {
@@ -87,90 +100,6 @@
 	[contentView addSubview:_contentBox];
 	
 	return contentView;
-}
-
-- (void) addNotifications{
-    
-    [[NSNotificationCenter defaultCenter] addObserverForName:kDPNotification_addNextViewController
-                                                      object:nil
-                                                       queue:[NSOperationQueue currentQueue]
-                                                  usingBlock:^(NSNotification *note) {
-                                                      
-                                                      NSDictionary *userInfo = [note userInfo];
-                                                      
-                                                      NSViewController<DPSetupWindowStageViewController> *viewController = nil;
-                                                      
-                                                      viewController = [userInfo objectForKey:kDPNotification_key_viewController];
-                                                      
-                                                      if (viewController) {
-                                                          
-                                                          NSMutableArray *newViewControllers = [[self viewControllers] mutableCopy];
-                                                          [newViewControllers insertObject:viewController atIndex:(currentStage + 1)];
-                                                          [self setViewControllers:[NSArray arrayWithArray:newViewControllers]];
-                                                      } 
-                                                  }];
-    
-    [[NSNotificationCenter defaultCenter] addObserverForName:kDPNotification_addFinalViewController
-                                                      object:nil
-                                                       queue:[NSOperationQueue currentQueue]
-                                                  usingBlock:^(NSNotification *note) {
-                                                      
-                                                      NSDictionary *userInfo = [note userInfo];
-                                                      
-                                                      NSViewController<DPSetupWindowStageViewController> *viewController = nil;
-                                                      
-                                                      viewController = [userInfo objectForKey:kDPNotification_key_viewController];
-                                                      
-                                                      if (viewController) {
-                                                          
-                                                          NSArray *newViewControllers = [[self viewControllers] arrayByAddingObject:viewController];
-                                                          [self setViewControllers:newViewControllers];
-                                                      }
-                                                  }];
-    
-    [[NSNotificationCenter defaultCenter] addObserverForName:kDPNotification_deleteViewController
-                                                      object:nil
-                                                       queue:[NSOperationQueue currentQueue]
-                                                  usingBlock:^(NSNotification *note) {
-                                                      
-                                                      NSDictionary *userInfo = [note userInfo];
-                                                      
-                                                      id mustDeleteController = nil;
-                                                      Class mustDeleteClass = nil;
-                                                      mustDeleteClass = [userInfo objectForKey:kDPNotification_key_viewControllerClass];
-                                                      
-                                                      NSMutableArray *viewControllers = [[self viewControllers] mutableCopy];
-                                                      for (id controller in viewControllers)
-                                                          if ([controller class]==mustDeleteClass)
-                                                              mustDeleteController = controller;
-                                                      
-                                                      if (mustDeleteController &&
-                                                          mustDeleteController != [viewControllers objectAtIndex:currentStage]) {
-                                                          
-                                                          @try {
-                                                              [self deregisterObserversForViewController:mustDeleteController];
-                                                          }
-                                                          @catch (NSException *exception) {}
-                                                          
-                                                          [viewControllers removeObject:mustDeleteController];
-                                                          [self setViewControllers:[NSArray arrayWithArray:viewControllers]];
-                                                      }
-                                                  }];
-}
-
-- (void) removeNotifications{
-    
-    [[NSNotificationCenter defaultCenter] removeObserver:self
-                                                    name:kDPNotification_addNextViewController
-                                                  object:nil];
-    
-    [[NSNotificationCenter defaultCenter] removeObserver:self
-                                                    name:kDPNotification_addFinalViewController
-                                                  object:nil];
-    
-    [[NSNotificationCenter defaultCenter] removeObserver:self
-                                                    name:kDPNotification_deleteViewController
-                                                  object:nil];
 }
 
 #pragma mark -
@@ -292,6 +221,9 @@ typedef enum {
 			[previousViewController performSelectorIfExists:@selector(didRevertToPreviousStage)];
 			[nextViewController performSelectorIfExists:@selector(didRevertToStage)];
 		}
+		if ([self.setupWindowDelegate respondsToSelector:@selector(setupWindow:didTransiteFrom:to:)]) {
+			[self.setupWindowDelegate setupWindow:self didTransiteFrom:previousViewController to:nextViewController];
+		}
 	};
 	
 	if ([self funnelsRepresentedObjects]) {
@@ -299,6 +231,9 @@ typedef enum {
 	}
 	
 	if ([self animates] && previousViewController) {
+		if ([self.setupWindowDelegate respondsToSelector:@selector(setupWindow:willTransiteFrom:to:)]) {
+			[self.setupWindowDelegate setupWindow:self willTransiteFrom:previousViewController to:nextViewController];
+		}
 		[NSAnimationContext beginGrouping];
 		
 		if ([[NSApp currentEvent] modifierFlags] & NSShiftKeyMask) {

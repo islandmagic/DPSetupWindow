@@ -22,6 +22,9 @@
 	didTransiteFrom:(NSViewController*)fromViewController
 				 to:(NSViewController*)toViewController;
 
+- (NSViewController*)setupWindow:(DPSetupWindow*)setupWindow
+             viewControllerAfter:(NSViewController*)viewController;
+
 @end
 
 @protocol DPSetupWindowStageViewController <NSObject>

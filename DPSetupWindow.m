@@ -8,25 +8,6 @@
 
 #import "DPSetupWindow.h"
 
-@interface NSObject (PerformSelectorIfExists)
-- (id)performSelectorIfExists:(SEL)selector;
-@end
-@implementation NSObject (PerformSelectorIfExists)
-
-- (id)performSelectorIfExists:(SEL)selector {
-	if ([self respondsToSelector:selector]) {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-		return [self performSelector:selector];
-#pragma clang diagnostic pop
-	} else {
-		return nil;
-	}
-}
-
-@end
-
-
 @interface DPSetupWindow ()
 
 @property (retain) NSImageView *imageView;
@@ -149,13 +130,18 @@ typedef enum {
     currentStage = 0;
     NSViewController<DPSetupWindowStageViewController> *nextViewController = [[self viewControllers] objectAtIndex:currentStage];
 	NSView *view = [nextViewController view];
-    
-    [nextViewController performSelectorIfExists:@selector(willProgressToStage)];
+
+    if ([nextViewController respondsToSelector:@selector(willProgressToStage)]) {
+        [nextViewController willProgressToStage];
+    }
     
     void (^finished)() = ^{
-        
-        [previousViewController performSelectorIfExists:@selector(didProgressToNextStage)];
-        [nextViewController performSelectorIfExists:@selector(didProgressToStage)];
+        if ([previousViewController respondsToSelector:@selector(didProgressToNextStage)]) {
+            [previousViewController didProgressToNextStage];
+        }
+        if ([nextViewController respondsToSelector:@selector(didProgressToStage)]) {
+            [nextViewController didProgressToStage];
+        }
 	};
     
     [view setFrame:NSMakeRect(0, 0, 400, 330)];
@@ -192,34 +178,62 @@ typedef enum {
 	}
 	
 	if (direction == DPSetupWindowNextDirection) {
-		[previousViewController performSelectorIfExists:@selector(willProgressToNextStage)];
+        if ([previousViewController respondsToSelector:@selector(willProgressToNextStage)]) {
+            [previousViewController willProgressToNextStage];
+        }
 	} else if (direction == DPSetupWindowBackDirection)	{
-		[previousViewController performSelectorIfExists:@selector(willRevertToPreviousStage)];
+        if ([previousViewController respondsToSelector:@selector(willRevertToPreviousStage)]) {
+            [previousViewController willRevertToPreviousStage];
+        }
 	}
-	
-	NSInteger nextStage = currentStage + direction;
-	if (nextStage == [[self viewControllers] count]) {
-        	//[self deregisterObserversForViewController:previousViewController];
-		[self completionHandler](YES);
-		return;
-	}
-	
+
+    const NSInteger nextStage = currentStage + direction;
+    if ([self.setupWindowDelegate respondsToSelector:@selector(setupWindow:viewControllerAfter:)]  && nextStage >= 0) {
+        NSViewController* vc = [self.setupWindowDelegate setupWindow:self
+                                                 viewControllerAfter:previousViewController];
+        if (vc) {
+            NSMutableArray* controllers = [self.viewControllers mutableCopy];
+            [controllers insertObject:vc atIndex:nextStage];
+            self.viewControllers = controllers;
+        }
+    }
+
+    if (nextStage == [[self viewControllers] count]) {
+        if ([self.setupWindowDelegate respondsToSelector:@selector(setupWindow:willTransiteFrom:to:)]) {
+            [self.setupWindowDelegate setupWindow:self willTransiteFrom:previousViewController to:nil];
+        }
+        [self completionHandler](YES);
+        return;
+    }
+
 	NSViewController<DPSetupWindowStageViewController> *nextViewController = [[self viewControllers] objectAtIndex:nextStage];
 	NSView *view = [nextViewController view];
 	
 	if (direction == DPSetupWindowNextDirection) {
-		[nextViewController performSelectorIfExists:@selector(willProgressToStage)];
+        if ([nextViewController respondsToSelector:@selector(willProgressToStage)]) {
+            [nextViewController willProgressToStage];
+        }
 	} else if (direction == DPSetupWindowBackDirection)	{
-		[nextViewController performSelectorIfExists:@selector(willRevertToStage)];
+        if ([nextViewController respondsToSelector:@selector(willRevertToStage)]) {
+            [nextViewController willRevertToStage];
+        }
 	}
 	
 	void (^finished)() = ^{
 		if (direction == DPSetupWindowNextDirection) {
-			[previousViewController performSelectorIfExists:@selector(didProgressToNextStage)];
-			[nextViewController performSelectorIfExists:@selector(didProgressToStage)];
+            if ([previousViewController respondsToSelector:@selector(didProgressToNextStage)]) {
+                [previousViewController didProgressToNextStage];
+            }
+            if ([nextViewController respondsToSelector:@selector(didProgressToStage)]) {
+                [nextViewController didProgressToStage];
+            }
 		} else if (direction == DPSetupWindowBackDirection)	{
-			[previousViewController performSelectorIfExists:@selector(didRevertToPreviousStage)];
-			[nextViewController performSelectorIfExists:@selector(didRevertToStage)];
+            if ([previousViewController respondsToSelector:@selector(didRevertToPreviousStage)]) {
+                [previousViewController didRevertToPreviousStage];
+            }
+            if ([nextViewController respondsToSelector:@selector(didRevertToStage)]) {
+                [nextViewController didRevertToStage];
+            }
 		}
 		if ([self.setupWindowDelegate respondsToSelector:@selector(setupWindow:didTransiteFrom:to:)]) {
 			[self.setupWindowDelegate setupWindow:self didTransiteFrom:previousViewController to:nextViewController];

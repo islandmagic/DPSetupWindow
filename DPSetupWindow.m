@@ -188,7 +188,7 @@ typedef enum {
 	}
 
     const NSInteger nextStage = currentStage + direction;
-    if ([self.setupWindowDelegate respondsToSelector:@selector(setupWindow:viewControllerAfter:)]  && nextStage >= 0) {
+    if (direction == DPSetupWindowNextDirection && [self.setupWindowDelegate respondsToSelector:@selector(setupWindow:viewControllerAfter:)] && nextStage >= 0) {
         NSViewController* vc = [self.setupWindowDelegate setupWindow:self
                                                  viewControllerAfter:previousViewController];
         if (vc) {

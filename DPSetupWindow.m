@@ -202,6 +202,7 @@ typedef enum {
         if ([self.setupWindowDelegate respondsToSelector:@selector(setupWindow:willTransiteFrom:to:)]) {
             [self.setupWindowDelegate setupWindow:self willTransiteFrom:previousViewController to:nil];
         }
+		[self deregisterObserversForViewController:self.currentViewController];
         [self completionHandler](YES);
         return;
     }
@@ -284,6 +285,7 @@ typedef enum {
 }
 
 - (void)cancel:(id)sender {
+	[self deregisterObserversForViewController:self.currentViewController];
 	[[NSApplication sharedApplication] endSheet:self returnCode:0];
 	[self completionHandler](NO);
 }
@@ -312,16 +314,16 @@ typedef enum {
 }
 
 - (void)registerObserversForPreviousViewController:(NSViewController *)previousViewController nextViewController:(NSViewController *)nextViewController {
-	
-	[previousViewController removeObserver:self forKeyPath:@"canContinue"];
-	[previousViewController removeObserver:self forKeyPath:@"canGoBack"];
+	[self deregisterObserversForViewController:self.currentViewController];
 	[nextViewController addObserver:self forKeyPath:@"canContinue" options:(NSKeyValueObservingOptionNew|NSKeyValueObservingOptionOld) context:NULL];
 	[nextViewController addObserver:self forKeyPath:@"canGoBack" options:(NSKeyValueObservingOptionNew|NSKeyValueObservingOptionOld) context:NULL];
+	self.currentViewController = nextViewController;
 }
 
 - (void)deregisterObserversForViewController:(NSViewController *)viewController {
-    	[viewController removeObserver:self forKeyPath:@"canContinue"];
-    	[viewController removeObserver:self forKeyPath:@"canGoBack"];
+	[viewController removeObserver:self forKeyPath:@"canContinue"];
+	[viewController removeObserver:self forKeyPath:@"canGoBack"];
+	self.currentViewController = nil;
 }
 
 - (void)resetButtonTitles {
